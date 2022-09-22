@@ -1,4 +1,4 @@
-from random import randint, choice
+from random import choice, randint
 
 
 def wallet_name_generator(n: int = 8) -> str:

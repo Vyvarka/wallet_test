@@ -1,5 +1,5 @@
-from django.db import models
 from django.contrib.auth.models import User
+from django.db import models
 
 
 class Wallet(models.Model):
@@ -33,7 +33,7 @@ class Transaction(models.Model):
     receiver = models.ForeignKey(Wallet, on_delete=models.PROTECT, related_name='receive_wallet')
     transfer_amount = models.DecimalField(max_digits=15, decimal_places=2)
     fee = models.DecimalField(max_digits=3, decimal_places=2)
-    status = models.CharField(max_length=6)
+    status = models.CharField(max_length=6)  # поставить статус по умолчанию FAILED, а после успешной транзакции менять на PAID
     timestamp = models.DateTimeField(auto_now_add=True)
     
     def __str__(self):

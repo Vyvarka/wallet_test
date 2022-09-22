@@ -1,10 +1,15 @@
+from django.urls import include, path
+
 from .views import *
-from django.urls import path, include
 
 urlpatterns = [
     path('', include('rest_framework.urls')),
     path('users/', UserListCreate.as_view()),
     path('users/<int:pk>/', UserDetail.as_view()),
-    path('wallet/', WalletListCreate.as_view()),
-    path('wallet/<path:name>/', WalletRetrieveDestroy.as_view())
+    path('wallets/', WalletListCreate.as_view()),
+    path('wallets/transactions/', TransactionListCreate.as_view()),
+    path('wallets/transactions/<int:pk>/', TransactionDetail.as_view()),
+    path('wallets/transactions/<path:wallet_name>/', TransactionWalletDetail.as_view()),
+    path('wallets/<path:name>/', WalletRetrieveDestroy.as_view()),
+    
 ]

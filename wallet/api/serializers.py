@@ -2,10 +2,11 @@ from django.contrib.auth.models import User
 from rest_framework import serializers
 
 from .models import *
-from .utils import wallet_name_generator, balance_generator
+from .utils import balance_generator, wallet_name_generator
 
 
 class UserSerializer(serializers.ModelSerializer):
+    # как отправить данные на авторизацию через postman?
     class Meta:
         model = User
         fields = ['id', 'username', 'password']
@@ -50,3 +51,32 @@ class WalletSerializer(serializers.ModelSerializer):
         instance.modified_on = validated_data.get('modified_on', instance.modified_on)
         instance.save()
         return instance
+
+
+#________________________________TRANSACTION________________________________
+class TransactionSerializer(serializers.ModelSerializer):
+    # как получать в поле "sender" только кошельки текущего пользователя?
+    fee = serializers.DecimalField(max_digits=3, decimal_places=2, read_only=True)
+    status = serializers.CharField(max_length=6, read_only=True)
+    timestamp = serializers.DateTimeField(read_only=True)
+    
+    class Meta:
+        model = Transaction
+        fields = '__all__'
+    # переопределить функцию создания транзакций. Во время транзакции рассчитывать
+    # комиссию, уменьшать сумму получения на размер комиссии, менять статус транзакции
+
+    # добавить валидацию по типу отправляемой суммы, по кошельку-отправителю и
+    # кошельку получателю (они не должны быть равны,
+    # отправлять можно только со своих кошельков, тип валюты должен совпадать)
+    
+
+class TransactionWalletDetailSerializer(serializers.ModelSerializer):
+    # как получать все данные связанных транзакций с кошельком?
+    send_wallet = serializers.StringRelatedField(many=True, read_only=True)
+    receive_wallet = serializers.StringRelatedField(many=True, read_only=True)
+    
+    class Meta:
+        model = Wallet
+        fields = ['name', 'send_wallet', 'receive_wallet']
+        

@@ -1,16 +1,16 @@
 from django.contrib.auth.models import User
-
+from django.db.models import Q
 from rest_framework import generics, status
 from rest_framework.permissions import IsAdminUser, IsAuthenticatedOrReadOnly
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from .serializers import *
-from .permissions import *
 from .models import *
+from .permissions import *
+from .serializers import *
 
 
-#________________________________USERS________________________________
+# ________________________________USERS________________________________
 class UserListCreate(generics.ListCreateAPIView):
     queryset = User.objects.all()
     serializer_class = UserSerializer
@@ -23,7 +23,7 @@ class UserDetail(generics.RetrieveAPIView):
     permission_classes = (IsOwnerOrAdminReadOnly,)
 
 
-#________________________________WALLET________________________________
+# ________________________________WALLET________________________________
 class WalletListCreate(generics.ListCreateAPIView):
     # queryset = Wallet.objects.all()
     serializer_class = WalletSerializer
@@ -42,7 +42,7 @@ class WalletListCreate(generics.ListCreateAPIView):
         self.perform_create(serializer)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
-    
+
 class WalletRetrieveDestroy(generics.RetrieveDestroyAPIView):
     queryset = Wallet.objects.all()
     serializer_class = WalletSerializer
@@ -65,4 +65,37 @@ class WalletRetrieveDestroy(generics.RetrieveDestroyAPIView):
         self.check_object_permissions(request, instance)
         self.perform_destroy(instance)
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+# ________________________________TRANSACTION________________________________
+class TransactionListCreate(generics.ListCreateAPIView):
+    queryset = Transaction.objects.all()
+    serializer_class = TransactionSerializer
+    
+    def get_queryset(self):
+        """
+        получаем только те транзакции, которые связаны с текущим пользователем, т.е.
+        где он выступал отправителем либо получателем.
+        """
+        return Transaction.objects.filter(
+            Q(sender__user=self.request.user) |
+            Q(receiver__user=self.request.user)
+        )
+
+
+class TransactionDetail(generics.RetrieveAPIView):
+    queryset = Transaction.objects.all()
+    serializer_class = TransactionSerializer
+    permission_classes = (IsSenderOrReceiverTransaction,)
+    
+
+class TransactionWalletDetail(generics.ListAPIView):
+    # queryset = Transaction.objects.all()
+    serializer_class = TransactionWalletDetailSerializer
+    
+    def get_queryset(self):
+        # можно смотреть транзакции только по своим кошелькам
+        lst = Wallet.objects.filter(name=self.kwargs['wallet_name']).filter(user=self.request.user)
+        return lst
+
     
