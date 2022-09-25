@@ -30,17 +30,6 @@ class WalletListCreate(generics.ListCreateAPIView):
     
     def get_queryset(self):
         return Wallet.objects.filter(user=self.request.user)
-    
-    def create(self, request, *args, **kwargs):
-        print(request.data)
-        lst = Wallet.objects.filter(user=request.user)
-        if len(lst) >= 5:
-            return Response({'error': 'You have created the maximum '
-                                      'possible number of wallets'})
-        serializer = self.get_serializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        self.perform_create(serializer)
-        return Response(serializer.data, status=status.HTTP_201_CREATED)
 
 
 class WalletRetrieveDestroy(generics.RetrieveDestroyAPIView):
@@ -91,11 +80,16 @@ class TransactionDetail(generics.RetrieveAPIView):
 
 class TransactionWalletDetail(generics.ListAPIView):
     # queryset = Transaction.objects.all()
-    serializer_class = TransactionWalletDetailSerializer
+    serializer_class = TransactionSerializer
     
     def get_queryset(self):
         # можно смотреть транзакции только по своим кошелькам
-        lst = Wallet.objects.filter(name=self.kwargs['wallet_name']).filter(user=self.request.user)
-        return lst
+        return Transaction.objects.filter(
+            Q(sender__name=self.kwargs['wallet_name']) |
+            Q(receiver__name=self.kwargs['wallet_name'])
+        ).filter(
+            Q(sender__user=self.request.user) |
+            Q(receiver__user=self.request.user)
+        )
 
     

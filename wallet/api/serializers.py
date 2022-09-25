@@ -1,4 +1,6 @@
 from django.contrib.auth.models import User
+from django.db import transaction
+
 from rest_framework import serializers
 
 from .models import *
@@ -25,23 +27,22 @@ class WalletSerializer(serializers.ModelSerializer):
         fields = '__all__'
         
     def validate_type(self, value):
-        lst = [x[0] for x in Wallet.TYPE]
-        if value not in lst:
+        types = [x[0] for x in Wallet.TYPE]
+        if value not in types:  # добавить проверку строки без учета регистра?
             raise serializers.ValidationError(
-                f'This field accepts the following values: {lst}')
-        return value
+                f'This field accepts the following values: {types}')
+        return value  # добавить преобразование строки для единого формата
     
     def validate_currency(self, value):
-        lst = [x[0] for x in Wallet.CURRENCY]
-        if value not in lst:
+        currencies = [x[0] for x in Wallet.CURRENCY]
+        if value not in currencies:  # добавить проверку строки без учета регистра?
             raise serializers.ValidationError(
-                f'This field accepts the following values: {lst}')
-        return value
+                f'This field accepts the following values: {currencies}')
+        return value  # добавить преобразование строки для единого формата
     
     def create(self, validated_data):
-        lst = Wallet.objects.filter(user=validated_data['user'])
-        if len(lst) < 5:
-            print('create wallet')
+        if Wallet.objects.filter(user=validated_data['user']).count() >= Wallet.MAX_WALLETS:
+            raise serializers.ValidationError(f'Limit wallets: {Wallet.MAX_WALLETS}')
         validated_data['name'] = wallet_name_generator()
         validated_data['balance'] = balance_generator(validated_data['currency']) or '0.00'
         return Wallet.objects.create(**validated_data)
@@ -69,14 +70,56 @@ class TransactionSerializer(serializers.ModelSerializer):
     # добавить валидацию по типу отправляемой суммы, по кошельку-отправителю и
     # кошельку получателю (они не должны быть равны,
     # отправлять можно только со своих кошельков, тип валюты должен совпадать)
+    def validate_sender(self, value):
+        return value
     
-
-class TransactionWalletDetailSerializer(serializers.ModelSerializer):
-    # как получать все данные связанных транзакций с кошельком?
-    send_wallet = serializers.StringRelatedField(many=True, read_only=True)
-    receive_wallet = serializers.StringRelatedField(many=True, read_only=True)
+    def validate_receiver(self, value):
+        return value
     
-    class Meta:
-        model = Wallet
-        fields = ['name', 'send_wallet', 'receive_wallet']
+    def validate_transfer_amount(self, value):
+        # print(self._kwargs.values())
+        min_value = 0.1  # 0,1 - мин сумма при комиссии 10%. 0,01/(10%)*(100%) = 0,1
+        if float(value) < min_value:
+            raise serializers.ValidationError(
+                f'This amount less than minimum value: {min_value}')
+        # if float(value) < balance:
+        #     raise serializers.ValidationError(
+        #         f'This amount gross than your balance')
+        return value
+    
+    def create(self, validated_data):
+        try:
+            s = Wallet.objects.get(name=validated_data['sender'])
+            r = Wallet.objects.get(name=validated_data['receiver'])
+        except:
+            raise serializers.ValidationError(
+                f'Not exist wallet'
+            )
         
+        if s.name == r.name:
+            raise serializers.ValidationError(
+                f'The sender cannot be the receiver'
+            )
+        if s.currency != r.currency:
+            raise serializers.ValidationError(
+                f'The receiver has other type currency'
+            )
+        if float(s.balance) < float(validated_data['transfer_amount']):
+            raise serializers.ValidationError(
+                f'Amount gross than your balance'
+            )
+        # if s.user != serializers.CurrentUserDefault():
+        #     raise serializers.ValidationError(
+        #         f'The current user is not sender'
+        #     )
+        if s.user != r.user:
+            validated_data['fee'] = '0.10'
+        with transaction.atomic():
+            # s.balance -= validated_data['transfer_amount']
+            # r.balance += (validated_data['transfer_amount'] -
+            #               validated_data['transfer_amount'] *
+            #               validated_data['fee'])
+            # s.save()
+            # r.save()
+            validated_data['status'] = 'PAID'
+        return Transaction.objects.create(**validated_data)

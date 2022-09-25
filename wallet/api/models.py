@@ -12,6 +12,7 @@ class Wallet(models.Model):
         ('eur', 'EUR'),
         ('rub', 'RUB'),
     )
+    MAX_WALLETS = 5
     
     name = models.CharField(max_length=8, unique=True)
     type = models.CharField(max_length=1, choices=TYPE, default='v')
@@ -29,11 +30,11 @@ class Wallet(models.Model):
     
 
 class Transaction(models.Model):
-    sender = models.ForeignKey(Wallet, on_delete=models.PROTECT, related_name='send_wallet')
-    receiver = models.ForeignKey(Wallet, on_delete=models.PROTECT, related_name='receive_wallet')
+    sender = models.ForeignKey(Wallet, on_delete=models.PROTECT, related_name='send_wallet', to_field='name')
+    receiver = models.ForeignKey(Wallet, on_delete=models.PROTECT, related_name='receive_wallet', to_field='name')
     transfer_amount = models.DecimalField(max_digits=15, decimal_places=2)
-    fee = models.DecimalField(max_digits=3, decimal_places=2)
-    status = models.CharField(max_length=6)  # поставить статус по умолчанию FAILED, а после успешной транзакции менять на PAID
+    fee = models.DecimalField(max_digits=3, decimal_places=2, default='0.00')
+    status = models.CharField(max_length=6, default='FAILED')  # поставить статус по умолчанию FAILED, а после успешной транзакции менять на PAID
     timestamp = models.DateTimeField(auto_now_add=True)
     
     def __str__(self):

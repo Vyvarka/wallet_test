@@ -34,7 +34,7 @@ def balance_generator(value):
         'eur': '3.00',
         'rub': '100.00',
     }
-    return dct[value]
+    return dct.get(value)
 
 # print(balance_generator('usd'))
     
