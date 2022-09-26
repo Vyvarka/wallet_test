@@ -1,5 +1,6 @@
 from django.contrib.auth.models import User
 from django.db import transaction
+from django.db.models import F
 
 from rest_framework import serializers
 
@@ -12,6 +13,9 @@ class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = ['id', 'username', 'password']
+
+    def create(self, validated_data):
+        return User.objects.create_user(**validated_data)
 
 
 #________________________________WALLET________________________________
@@ -60,31 +64,16 @@ class TransactionSerializer(serializers.ModelSerializer):
     fee = serializers.DecimalField(max_digits=3, decimal_places=2, read_only=True)
     status = serializers.CharField(max_length=6, read_only=True)
     timestamp = serializers.DateTimeField(read_only=True)
-    
+
     class Meta:
         model = Transaction
         fields = '__all__'
-    # переопределить функцию создания транзакций. Во время транзакции рассчитывать
-    # комиссию, уменьшать сумму получения на размер комиссии, менять статус транзакции
 
-    # добавить валидацию по типу отправляемой суммы, по кошельку-отправителю и
-    # кошельку получателю (они не должны быть равны,
-    # отправлять можно только со своих кошельков, тип валюты должен совпадать)
-    def validate_sender(self, value):
-        return value
-    
-    def validate_receiver(self, value):
-        return value
-    
     def validate_transfer_amount(self, value):
-        # print(self._kwargs.values())
         min_value = 0.1  # 0,1 - мин сумма при комиссии 10%. 0,01/(10%)*(100%) = 0,1
         if float(value) < min_value:
             raise serializers.ValidationError(
                 f'This amount less than minimum value: {min_value}')
-        # if float(value) < balance:
-        #     raise serializers.ValidationError(
-        #         f'This amount gross than your balance')
         return value
     
     def create(self, validated_data):
@@ -95,31 +84,37 @@ class TransactionSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(
                 f'Not exist wallet'
             )
-        
-        if s.name == r.name:
+        # блок проверок перед выполнением транзакции и сохранением в БД
+        if s.name == r.name:  # имя кошелька-отправителя не должно совпадать с получателем
             raise serializers.ValidationError(
                 f'The sender cannot be the receiver'
             )
-        if s.currency != r.currency:
+        if s.currency != r.currency:  # валюты должны совпадать
             raise serializers.ValidationError(
                 f'The receiver has other type currency'
             )
-        if float(s.balance) < float(validated_data['transfer_amount']):
+        if float(s.balance) < float(validated_data['transfer_amount']):  # сумма перевода не должна превышать баланс
             raise serializers.ValidationError(
                 f'Amount gross than your balance'
             )
-        # if s.user != serializers.CurrentUserDefault():
-        #     raise serializers.ValidationError(
-        #         f'The current user is not sender'
-        #     )
-        if s.user != r.user:
-            validated_data['fee'] = '0.10'
+        if s.user != self.context['request'].user:  # нельзя отправить средства с чужого кошелька
+            raise serializers.ValidationError(
+                f'The current user cannot be the sender'
+            )
+        if s.user != r.user:  # устанавливаем комиссию при отправке на чужой кошелек
+            validated_data['fee'] = Transaction.FEE
+        fee_amount = round(
+            float(validated_data['transfer_amount']) * float(validated_data.get('fee', 0.00)), 2
+        )
+
         with transaction.atomic():
-            # s.balance -= validated_data['transfer_amount']
-            # r.balance += (validated_data['transfer_amount'] -
-            #               validated_data['transfer_amount'] *
-            #               validated_data['fee'])
-            # s.save()
-            # r.save()
+            # уменьшаем баланс отправителя
+            s.balance = F('balance') - validated_data['transfer_amount']
+            # увеличиваем баланс получателя с учетом комиссии
+            r.balance = F('balance') + validated_data['transfer_amount'] - str(fee_amount)
+            # сохраняем результат в БД
+            s.save()
+            r.save()
+            # меняем статус транзакции
             validated_data['status'] = 'PAID'
         return Transaction.objects.create(**validated_data)

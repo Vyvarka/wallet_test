@@ -30,6 +30,8 @@ class Wallet(models.Model):
     
 
 class Transaction(models.Model):
+    FEE = '0.01'
+
     sender = models.ForeignKey(Wallet, on_delete=models.PROTECT, related_name='send_wallet', to_field='name')
     receiver = models.ForeignKey(Wallet, on_delete=models.PROTECT, related_name='receive_wallet', to_field='name')
     transfer_amount = models.DecimalField(max_digits=15, decimal_places=2)

@@ -15,7 +15,7 @@ def wallet_name_generator(n: int = 8) -> str:
     return result
 
 
-def test_url_generator(f, n=10_000_000):
+def test_generator(f, n=10_000_000):
     '''
     Тестируем вероятность совпадения имен
     И видим, что адреса не уникальны: Длинна_1: 10 000 000; Длинна_2: 9 999 983
@@ -25,7 +25,7 @@ def test_url_generator(f, n=10_000_000):
           f'Длинна_2: {len(set(lst))}')
 
 
-# test_url_generator(wallet_name_generator)
+# test_generator(wallet_name_generator)
 # print(wallet_name_generator())
 
 def balance_generator(value):
