@@ -1,15 +1,17 @@
+from decimal import Decimal
+
 from django.contrib.auth.models import User
 from django.db import transaction
 from django.db.models import F
 
 from rest_framework import serializers
+from rest_framework.generics import get_object_or_404
 
 from .models import *
 from .utils import balance_generator, wallet_name_generator
 
 
 class UserSerializer(serializers.ModelSerializer):
-    # как отправить данные на авторизацию через postman?
     class Meta:
         model = User
         fields = ['id', 'username', 'password']
@@ -30,19 +32,19 @@ class WalletSerializer(serializers.ModelSerializer):
         model = Wallet
         fields = '__all__'
         
-    def validate_type(self, value):
+    def validate_type(self, value: str):
         types = [x[0] for x in Wallet.TYPE]
-        if value not in types:  # добавить проверку строки без учета регистра?
+        if value.lower() not in types:
             raise serializers.ValidationError(
                 f'This field accepts the following values: {types}')
-        return value  # добавить преобразование строки для единого формата
+        return value.lower()
     
-    def validate_currency(self, value):
+    def validate_currency(self, value: str):
         currencies = [x[0] for x in Wallet.CURRENCY]
-        if value not in currencies:  # добавить проверку строки без учета регистра?
+        if value.lower() not in currencies:
             raise serializers.ValidationError(
                 f'This field accepts the following values: {currencies}')
-        return value  # добавить преобразование строки для единого формата
+        return value.lower()
     
     def create(self, validated_data):
         if Wallet.objects.filter(user=validated_data['user']).count() >= Wallet.MAX_WALLETS:
@@ -77,44 +79,39 @@ class TransactionSerializer(serializers.ModelSerializer):
         return value
     
     def create(self, validated_data):
-        try:
-            s = Wallet.objects.get(name=validated_data['sender'])
-            r = Wallet.objects.get(name=validated_data['receiver'])
-        except:
-            raise serializers.ValidationError(
-                f'Not exist wallet'
-            )
+        sender = get_object_or_404(Wallet, name=validated_data['sender'])
+        receiver = get_object_or_404(Wallet, name=validated_data['receiver'])
+
         # блок проверок перед выполнением транзакции и сохранением в БД
-        if s.name == r.name:  # имя кошелька-отправителя не должно совпадать с получателем
+        if sender.name == receiver.name:  # имя кошелька-отправителя не должно совпадать с получателем
             raise serializers.ValidationError(
                 f'The sender cannot be the receiver'
             )
-        if s.currency != r.currency:  # валюты должны совпадать
+        if sender.currency != receiver.currency:  # валюты кошельков должны совпадать
             raise serializers.ValidationError(
                 f'The receiver has other type currency'
             )
-        if float(s.balance) < float(validated_data['transfer_amount']):  # сумма перевода не должна превышать баланс
+        if float(sender.balance) < float(validated_data['transfer_amount']):  # сумма перевода не должна превышать баланс
             raise serializers.ValidationError(
-                f'Amount gross than your balance'
+                f'The transfer amount grosser than your balance'
             )
-        if s.user != self.context['request'].user:  # нельзя отправить средства с чужого кошелька
+        if sender.user != self.context['request'].user:  # нельзя отправить средства с чужого кошелька
             raise serializers.ValidationError(
-                f'The current user cannot be the sender'
+                f'The current user cannot be the sender from this wallet{sender.name}'
             )
-        if s.user != r.user:  # устанавливаем комиссию при отправке на чужой кошелек
+        if sender.user != receiver.user:  # устанавливаем комиссию при отправке на чужой кошелек
             validated_data['fee'] = Transaction.FEE
         fee_amount = round(
-            float(validated_data['transfer_amount']) * float(validated_data.get('fee', 0.00)), 2
+            Decimal(validated_data['transfer_amount']) * Decimal(validated_data.get('fee', 0.00)), 2
         )
 
         with transaction.atomic():
             # уменьшаем баланс отправителя
-            s.balance = F('balance') - validated_data['transfer_amount']
+            sender.balance = F('balance') - validated_data['transfer_amount']
             # увеличиваем баланс получателя с учетом комиссии
-            r.balance = F('balance') + validated_data['transfer_amount'] - str(fee_amount)
-            # сохраняем результат в БД
-            s.save()
-            r.save()
+            receiver.balance = F('balance') + validated_data['transfer_amount'] - str(fee_amount)
+            sender.save()
+            receiver.save()
             # меняем статус транзакции
             validated_data['status'] = 'PAID'
         return Transaction.objects.create(**validated_data)

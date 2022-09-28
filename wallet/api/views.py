@@ -1,9 +1,9 @@
 from django.contrib.auth.models import User
 from django.db.models import Q
 from rest_framework import generics, status
-from rest_framework.permissions import IsAdminUser, IsAuthenticatedOrReadOnly
+from rest_framework.generics import get_object_or_404
+from rest_framework.permissions import IsAdminUser, IsAuthenticatedOrReadOnly, IsAuthenticated, AllowAny
 from rest_framework.response import Response
-from rest_framework.views import APIView
 
 from .models import *
 from .permissions import *
@@ -14,7 +14,12 @@ from .serializers import *
 class UserListCreate(generics.ListCreateAPIView):
     queryset = User.objects.all()
     serializer_class = UserSerializer
-    permission_classes = (IsAdminUser,)
+    permission_classes = (AllowAny,)
+
+    def get_queryset(self):
+        if self.request.user.is_staff:
+            return User.objects.all()
+        return User.objects.filter(id=self.request.user.id)
 
 
 class UserDetail(generics.RetrieveAPIView):
@@ -25,7 +30,6 @@ class UserDetail(generics.RetrieveAPIView):
 
 # ________________________________WALLET________________________________
 class WalletListCreate(generics.ListCreateAPIView):
-    # queryset = Wallet.objects.all()
     serializer_class = WalletSerializer
     
     def get_queryset(self):
@@ -38,19 +42,13 @@ class WalletRetrieveDestroy(generics.RetrieveDestroyAPIView):
     permission_classes = (IsOwnerWallet,)
     
     def retrieve(self, request, *args, **kwargs):
-        try:
-            instance = Wallet.objects.get(name=kwargs['name'])
-        except:
-            return Response({'error': 'Wallet does not exist'})
+        instance = get_object_or_404(Wallet, name=kwargs['name'])
         self.check_object_permissions(request, instance)
         serializer = self.get_serializer(instance)
         return Response(serializer.data)
     
     def destroy(self, request, *args, **kwargs):
-        try:
-            instance = Wallet.objects.get(name=kwargs['name'])
-        except:
-            return Response({'error': 'Wallet does not exist'})
+        instance = get_object_or_404(Wallet, name=kwargs['name'])
         self.check_object_permissions(request, instance)
         self.perform_destroy(instance)
         return Response(status=status.HTTP_204_NO_CONTENT)
@@ -58,7 +56,6 @@ class WalletRetrieveDestroy(generics.RetrieveDestroyAPIView):
 
 # ________________________________TRANSACTION________________________________
 class TransactionListCreate(generics.ListCreateAPIView):
-    queryset = Transaction.objects.all()
     serializer_class = TransactionSerializer
     
     def get_queryset(self):
@@ -79,7 +76,6 @@ class TransactionDetail(generics.RetrieveAPIView):
     
 
 class TransactionWalletDetail(generics.ListAPIView):
-    # queryset = Transaction.objects.all()
     serializer_class = TransactionSerializer
     
     def get_queryset(self):

@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from django.contrib.auth.models import User
 from django.db import models
 
@@ -30,7 +32,7 @@ class Wallet(models.Model):
     
 
 class Transaction(models.Model):
-    FEE = '0.01'
+    FEE = Decimal('0.10')
 
     sender = models.ForeignKey(Wallet, on_delete=models.PROTECT, related_name='send_wallet', to_field='name')
     receiver = models.ForeignKey(Wallet, on_delete=models.PROTECT, related_name='receive_wallet', to_field='name')
