@@ -97,7 +97,7 @@ class TransactionSerializer(serializers.ModelSerializer):
             )
         if sender.user != self.context['request'].user:  # нельзя отправить средства с чужого кошелька
             raise serializers.ValidationError(
-                f'The current user cannot be the sender from this wallet{sender.name}'
+                f'The current user cannot be the sender from this wallet {sender.name}'
             )
         if sender.user != receiver.user:  # устанавливаем комиссию при отправке на чужой кошелек
             validated_data['fee'] = Transaction.FEE

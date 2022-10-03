@@ -1,0 +1,19 @@
+[tool.black]
+line-length = 82
+include = '\.pyi?$'
+exclude = '''
+/(
+	\.git
+| \.hg
+| \.mypy_cache
+| \.tox
+| \.venv
+| \.env
+| \.test.env
+| \.pytest_cache
+| \wallet\settings.py
+| _build
+| buck-out
+| build
+)/
+'''

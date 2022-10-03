@@ -10,8 +10,9 @@ class IsOwnerOrAdminReadOnly(permissions.BasePermission):
     
 class IsOwnerWallet(permissions.BasePermission):
     def has_object_permission(self, request, view, obj):
-        if request.method in permissions.SAFE_METHODS:
-            return obj.user == request.user
+        safe_methods = ['GET', 'DELETE']
+        if request.method in safe_methods:
+            return bool(obj.user == request.user)
         return False
     
 

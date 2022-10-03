@@ -1,5 +1,7 @@
 from django.contrib.auth.models import User
 from django.db.models import Q
+from django.http import SimpleCookie
+from django.shortcuts import redirect
 from rest_framework import generics, status
 from rest_framework.generics import get_object_or_404
 from rest_framework.permissions import IsAdminUser, IsAuthenticatedOrReadOnly, IsAuthenticated, AllowAny
@@ -9,6 +11,7 @@ from .models import *
 from .permissions import *
 from .serializers import *
 
+SimpleCookie()
 
 # ________________________________USERS________________________________
 class UserListCreate(generics.ListCreateAPIView):
